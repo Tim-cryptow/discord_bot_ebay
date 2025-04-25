@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import os
 
-TOKEN = "DISCORD_TOKEN"
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True

@@ -1,4 +1,5 @@
 import discord
+discord.opus = None
 from discord.ext import commands # type: ignore
 import requests
 from bs4 import BeautifulSoup

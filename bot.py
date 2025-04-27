@@ -1,9 +1,9 @@
+import os
+os.environ["DISCORD_NO_VOICE"] = "1"
 import discord
-discord.opus = None
 from discord.ext import commands # type: ignore
 import requests
 from bs4 import BeautifulSoup
-import os
 import sys
 
 TOKEN = os.getenv("DISCORD_TOKEN")

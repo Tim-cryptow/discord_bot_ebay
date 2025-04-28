@@ -15,12 +15,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 def get_sold_items(item_name):
     """
-    Fetches sold items from eBay based on the provided item name, including the sold price and image.
+    Fetches sold items from eBay based on the provided item name, including sold price and image.
     """
     query = "+".join(item_name.split())
     url = f"https://www.ebay.com/sch/i.html?_nkw={query}&LH_Complete=1&LH_Sold=1"
     
-    response = requests.get(url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/122.0.0.0 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
         return {"error": "Unable to fetch results from eBay."}
     
@@ -31,16 +36,17 @@ def get_sold_items(item_name):
         link_tag = item.select_one('.s-item__link[href]')
         title_tag = item.select_one('.s-item__title')
         price_tag = item.select_one('.s-item__price')
-        image_tag = item.select_one('.s-item__image-img')
 
+        # image is often nested inside div with background-image or img tag
+        image_tag = item.select_one('.s-item__image img')
         image_url = None
+
         if image_tag:
-            if image_tag.has_attr('src'):
-                image_url = image_tag['src']
-            elif image_tag.has_attr('data-src'):
-                image_url = image_tag['data-src']
-            elif image_tag.has_attr('data-img-src'):
-                image_url = image_tag['data-img-src']
+            image_url = image_tag.get('src') or image_tag.get('data-src') or image_tag.get('data-img-src')
+
+            # Some images are placeholders - we want to ignore those
+            if image_url and 'ir.ebaystatic.com' in image_url:
+                image_url = None
 
         if link_tag and title_tag and price_tag:
             link = link_tag['href']
@@ -54,7 +60,7 @@ def get_sold_items(item_name):
                     "link": link,
                     "image": image_url
                 })
-    
+
     return sold_items[:3] if sold_items else {"error": "No valid sold items found."}
 
 @bot.command()
@@ -82,5 +88,4 @@ async def ebay(ctx, *, item_name):
             embed.set_thumbnail(url=item['image'])  # Add the item's image as a thumbnail
 
         await ctx.send(embed=embed)
-
 bot.run(TOKEN)

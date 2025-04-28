@@ -31,13 +31,21 @@ def get_sold_items(item_name):
         link_tag = item.select_one('.s-item__link[href]')
         title_tag = item.select_one('.s-item__title')
         price_tag = item.select_one('.s-item__price')
-        image_tag = item.select_one('.s-item__image-img')  # Extract the item's image URL
+        image_tag = item.select_one('.s-item__image-img')
+
+        image_url = None
+        if image_tag:
+            if image_tag.has_attr('src'):
+                image_url = image_tag['src']
+            elif image_tag.has_attr('data-src'):
+                image_url = image_tag['data-src']
+            elif image_tag.has_attr('data-img-src'):
+                image_url = image_tag['data-img-src']
 
         if link_tag and title_tag and price_tag:
             link = link_tag['href']
             title = title_tag.text.strip()
             price = price_tag.text.strip()
-            image_url = image_tag['src'] if image_tag and image_tag.has_attr('src') else None
 
             if link.startswith("https://www.ebay.com/itm/") and "itm/" in link:
                 sold_items.append({

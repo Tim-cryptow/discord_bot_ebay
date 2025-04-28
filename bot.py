@@ -13,9 +13,28 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+def get_high_res_image(item_url):
+    """
+    Fetches the high-res image from the individual eBay item page.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; DiscordBot/1.0; +https://discordapp.com)"
+    }
+    try:
+        response = requests.get(item_url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return None
+        soup = BeautifulSoup(response.text, 'html.parser')
+        og_image = soup.find('meta', property='og:image')
+        if og_image and og_image.get('content'):
+            return og_image['content']
+    except Exception as e:
+        print(f"Error fetching high-res image: {e}")
+    return None
+
 def get_sold_items(item_name):
     """
-    Fetches sold items from eBay based on the provided item name, including the sold price and image.
+    Fetches sold items from eBay based on the provided item name.
     """
     query = "+".join(item_name.split())
     url = f"https://www.ebay.com/sch/i.html?_nkw={query}&LH_Complete=1&LH_Sold=1"
@@ -34,16 +53,6 @@ def get_sold_items(item_name):
         link_tag = item.select_one('.s-item__link[href]')
         title_tag = item.select_one('.s-item__title')
         price_tag = item.select_one('.s-item__price')
-        image_tag = item.select_one('.s-item__image-img')
-
-        image_url = None
-        if image_tag:
-            # Try to find a usable image
-            for attr in ['src', 'data-src', 'data-img-src']:
-                candidate = image_tag.get(attr)
-                if candidate and 's-l64' not in candidate and not candidate.endswith('s_1x2.gif'):
-                    image_url = candidate
-                    break
 
         if link_tag and title_tag and price_tag:
             link = link_tag['href']
@@ -54,8 +63,7 @@ def get_sold_items(item_name):
                 sold_items.append({
                     "title": title,
                     "price": price,
-                    "link": link,
-                    "image": image_url
+                    "link": link
                 })
     
     return sold_items[:3] if sold_items else {"error": "No valid sold items found."}
@@ -63,7 +71,7 @@ def get_sold_items(item_name):
 @bot.command()
 async def ebay(ctx, *, item_name):
     """
-    Discord command to search for sold eBay items and display results in the preferred format with images.
+    Discord command to search for sold eBay items and display results.
     """
     await ctx.send(f"🔎 Searching eBay for sold items matching: **{item_name}**...")
     results = get_sold_items(item_name)
@@ -81,8 +89,10 @@ async def ebay(ctx, *, item_name):
             ),
             color=discord.Color.blue()
         )
-        if item.get('image'):
-            embed.set_thumbnail(url=item['image'])  # Set valid image URL if available
+        
+        image_url = get_high_res_image(item['link'])
+        if image_url:
+            embed.set_thumbnail(url=image_url)
 
         await ctx.send(embed=embed)
 

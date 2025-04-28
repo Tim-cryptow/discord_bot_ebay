@@ -20,7 +20,10 @@ def get_sold_items(item_name):
     query = "+".join(item_name.split())
     url = f"https://www.ebay.com/sch/i.html?_nkw={query}&LH_Complete=1&LH_Sold=1"
     
-    response = requests.get(url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; DiscordBot/1.0; +https://discordapp.com)"
+    }
+    response = requests.get(url, headers=headers, timeout=10)
     if response.status_code != 200:
         return {"error": "Unable to fetch results from eBay."}
     
@@ -35,12 +38,12 @@ def get_sold_items(item_name):
 
         image_url = None
         if image_tag:
-            if image_tag.has_attr('src'):
-                image_url = image_tag['src']
-            elif image_tag.has_attr('data-src'):
-                image_url = image_tag['data-src']
-            elif image_tag.has_attr('data-img-src'):
-                image_url = image_tag['data-img-src']
+            # Try to find a usable image
+            for attr in ['src', 'data-src', 'data-img-src']:
+                candidate = image_tag.get(attr)
+                if candidate and 's-l64' not in candidate and not candidate.endswith('s_1x2.gif'):
+                    image_url = candidate
+                    break
 
         if link_tag and title_tag and price_tag:
             link = link_tag['href']
@@ -79,7 +82,7 @@ async def ebay(ctx, *, item_name):
             color=discord.Color.blue()
         )
         if item.get('image'):
-            embed.set_thumbnail(url=item['image'])  # Add the item's image as a thumbnail
+            embed.set_thumbnail(url=item['image'])  # Set valid image URL if available
 
         await ctx.send(embed=embed)
 

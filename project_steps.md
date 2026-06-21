@@ -42,43 +42,28 @@ This file outlines the steps to create, configure, and deploy the Discord eBay B
 
 ## 3. Testing Locally
 
-1. Run the bot locally:
+1. Provide the token and run the bot locally (the bot reads `DISCORD_TOKEN` from the
+   environment):
    ```bash
+   cp .env.example .env   # then edit .env and paste your token
+   set -a; source .env; set +a
    python bot.py
    ```
 
-2. Test the bot commands on your Discord server.
+2. Test the bot commands on your Discord server, e.g. `!ebay pokemon charizard`.
 
 ---
 
-## 4. **Preparing for Deployment**
+## 4. Deployment
 
-1. Create a `discord_bot.service` file for systemd to run the bot as a service
-   
-2. Place the file in `/etc/systemd/system/`.
+The bot runs as a `systemd` service. A complete, step-by-step DigitalOcean Droplet
+walkthrough lives in [`DEPLOY.md`](./DEPLOY.md), covering server setup, the service
+user, the virtual environment, token handling via `/etc/discord_bot_ebay.env`, and
+verification.
 
----
-
-## 5. Deploying on Contabo
-
-1. Log in to your Contabo server using SSH.
-2. Upload your project files to the server:
-   ```bash
-   scp -r /local/project/path user@server-ip:/remote/project/path
-   ```
-
-3. Install Python and dependencies on the server:
-   ```bash
-   sudo apt update
-   sudo apt install python3 python3-pip
-   pip install -r requirements.txt
-   ```
-
-4. Start the bot as a service:
-   ```bash
-   sudo systemctl enable discord_bot
-   sudo systemctl start discord_bot
-   ```
+The unit file is [`discord_bot.service`](./discord_bot.service); install it to
+`/etc/systemd/system/` and load the token from the environment file rather than
+hardcoding it.
 
 ---
 

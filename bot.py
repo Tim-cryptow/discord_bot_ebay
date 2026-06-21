@@ -17,6 +17,9 @@ logging.basicConfig(
 logger = logging.getLogger("discord_bot_ebay")
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+# Optional residential proxy, e.g. "http://user:pass@host:port". eBay blocks datacenter
+# IPs, so a proxy is required on hosts like DigitalOcean. Unset/empty = direct connection.
+EBAY_PROXY = os.getenv("EBAY_PROXY")
 
 EBAY_SEARCH_URL = "https://www.ebay.com/sch/i.html"
 MAX_RESULTS = 3
@@ -57,7 +60,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 def _build_session():
-    session = http.Session(impersonate=IMPERSONATE)
+    proxies = {"http": EBAY_PROXY, "https": EBAY_PROXY} if EBAY_PROXY else None
+    session = http.Session(impersonate=IMPERSONATE, proxies=proxies)
     session.headers.update({"Referer": "https://www.ebay.com/"})
     return session
 
@@ -200,6 +204,7 @@ def main():
     if not TOKEN:
         logger.error("DISCORD_TOKEN environment variable is not set. Exiting.")
         sys.exit(1)
+    logger.info("eBay proxy configured: %s", "yes" if EBAY_PROXY else "no")
     bot.run(TOKEN)
 
 

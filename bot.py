@@ -7,7 +7,7 @@ import sys
 
 import discord
 from discord.ext import commands  # type: ignore
-import requests
+from curl_cffi import requests as http
 from bs4 import BeautifulSoup
 
 logging.basicConfig(
@@ -21,23 +21,11 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 EBAY_SEARCH_URL = "https://www.ebay.com/sch/i.html"
 MAX_RESULTS = 3
 
-# Headers that mimic a real browser. eBay serves 403/challenge pages to requests
-# that look automated, so a complete and consistent header set matters.
-BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": (
-        "text/html,application/xhtml+xml,application/xml;q=0.9,"
-        "image/avif,image/webp,*/*;q=0.8"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate",
-    "Referer": "https://www.ebay.com/",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-}
+# eBay's bot protection (Akamai) fingerprints the TLS/HTTP client, so spoofing headers
+# alone is not enough -- plain requests still gets a 403. curl_cffi impersonates a real
+# Chrome TLS fingerprint, which is what gets past the block. Impersonation also supplies a
+# coherent Chrome header set; we only add a Referer on top.
+IMPERSONATE = "chrome"
 
 # eBay serves two search-result layouts. Newer pages use the ".s-card" structure,
 # older pages use ".s-item". Detect whichever is present and parse accordingly.
@@ -69,8 +57,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 
 def _build_session():
-    session = requests.Session()
-    session.headers.update(BROWSER_HEADERS)
+    session = http.Session(impersonate=IMPERSONATE)
+    session.headers.update({"Referer": "https://www.ebay.com/"})
     return session
 
 
@@ -99,7 +87,7 @@ def get_high_res_image(session, item_url):
         og_image = soup.find("meta", property="og:image")
         if og_image and og_image.get("content"):
             return og_image["content"]
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.warning("Failed to fetch high-res image from %s: %s", item_url, exc)
     return None
 
@@ -154,7 +142,7 @@ def get_sold_items(item_name):
 
     try:
         response = session.get(EBAY_SEARCH_URL, params=params, timeout=15)
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.error("eBay request failed: %s", exc)
         return {"error": "Could not reach eBay. Please try again later."}
 

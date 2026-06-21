@@ -14,7 +14,14 @@ RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=discordbot
-Environment="DISCORD_TOKEN=your_bot_token_here"
+
+# Secrets are loaded from a root-owned file kept out of version control.
+# Create /etc/discord_bot_ebay.env containing: DISCORD_TOKEN=your_real_token
+EnvironmentFile=/etc/discord_bot_ebay.env
+
+# Light hardening.
+NoNewPrivileges=true
+ProtectSystem=full
 
 [Install]
 WantedBy=multi-user.target

@@ -23,6 +23,9 @@ EBAY_PROXY = os.getenv("EBAY_PROXY")
 
 EBAY_SEARCH_URL = "https://www.ebay.com/sch/i.html"
 MAX_RESULTS = 3
+# Rotating residential proxies serve some IPs eBay has flagged; each attempt uses a fresh
+# session (a fresh rotating IP), so retry a few times before giving up.
+EBAY_MAX_ATTEMPTS = 4
 
 # eBay's bot protection (Akamai) fingerprints the TLS/HTTP client, so spoofing headers
 # alone is not enough -- plain requests still gets a 403. curl_cffi impersonates a real
@@ -140,33 +143,44 @@ def parse_search_html(html):
 
 
 def get_sold_items(item_name):
-    """Fetches up to MAX_RESULTS sold eBay listings matching item_name."""
-    session = _build_session()
+    """Fetches up to MAX_RESULTS sold eBay listings matching item_name.
+
+    A rotating residential proxy hands out some IPs that eBay has flagged, so any single
+    request can hit a 403 / anti-bot page even when the proxy is healthy. Each attempt uses
+    a fresh session (and therefore a fresh rotating IP), so we retry before giving up.
+    """
     params = {"_nkw": item_name, "LH_Complete": "1", "LH_Sold": "1"}
+    last_error = "eBay is blocking requests right now. Please try again in a moment."
 
-    try:
-        response = session.get(EBAY_SEARCH_URL, params=params, timeout=15)
-    except Exception as exc:
-        logger.error("eBay request failed: %s", exc)
-        return {"error": "Could not reach eBay. Please try again later."}
+    for attempt in range(1, EBAY_MAX_ATTEMPTS + 1):
+        session = _build_session()
+        try:
+            response = session.get(EBAY_SEARCH_URL, params=params, timeout=15)
+        except Exception as exc:
+            logger.warning("eBay request failed (attempt %d/%d): %s",
+                           attempt, EBAY_MAX_ATTEMPTS, exc)
+            last_error = "Could not reach eBay. Please try again later."
+            continue
 
-    if response.status_code != 200:
-        logger.error("eBay returned HTTP %s for query %r", response.status_code, item_name)
-        return {"error": f"eBay returned an error (HTTP {response.status_code})."}
+        if response.status_code != 200 or _looks_blocked(response.text):
+            logger.warning("eBay blocked (attempt %d/%d, status %s) for query %r",
+                           attempt, EBAY_MAX_ATTEMPTS, response.status_code, item_name)
+            continue
 
-    if _looks_blocked(response.text):
-        logger.error("eBay served an anti-bot page for query %r", item_name)
-        return {"error": "eBay is currently blocking automated requests. Please try again later."}
+        items = parse_search_html(response.text)
+        if not items:
+            logger.warning("No sold items parsed (attempt %d/%d) for query %r",
+                           attempt, EBAY_MAX_ATTEMPTS, item_name)
+            last_error = "No sold items found for that search."
+            continue
 
-    items = parse_search_html(response.text)
-    if not items:
-        logger.warning("No sold items parsed for query %r", item_name)
-        return {"error": "No sold items found for that search."}
+        for item in items:
+            if not item["image"]:
+                item["image"] = get_high_res_image(session, item["link"])
+        return items
 
-    for item in items:
-        if not item["image"]:
-            item["image"] = get_high_res_image(session, item["link"])
-    return items
+    logger.error("eBay failed after %d attempts for query %r", EBAY_MAX_ATTEMPTS, item_name)
+    return {"error": last_error}
 
 
 @bot.command()

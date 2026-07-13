@@ -107,6 +107,51 @@ def test_block_detection():
     assert bot._looks_blocked("<html>normal results page</html>") is False
 
 
+class _FakeResponse:
+    def __init__(self, status_code, text):
+        self.status_code = status_code
+        self.text = text
+
+
+class _FakeSession:
+    """Returns queued responses in order (repeating the last) to simulate retries."""
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    def get(self, *args, **kwargs):
+        resp = self._responses[min(self.calls, len(self._responses) - 1)]
+        self.calls += 1
+        return resp
+
+
+def test_retry_recovers_after_blocked_ip():
+    # First attempt gets a 403 (flagged proxy IP), retry lands a good IP.
+    fake = _FakeSession([_FakeResponse(403, ""), _FakeResponse(200, S_CARD_HTML)])
+    orig_build, orig_img = bot._build_session, bot.get_high_res_image
+    bot._build_session = lambda: fake
+    bot.get_high_res_image = lambda session, url: None
+    try:
+        result = bot.get_sold_items("charizard")
+    finally:
+        bot._build_session, bot.get_high_res_image = orig_build, orig_img
+    assert isinstance(result, list) and len(result) == 2, result
+    assert fake.calls == 2
+
+
+def test_gives_up_after_max_attempts():
+    fake = _FakeSession([_FakeResponse(403, "")])  # always blocked
+    orig_build = bot._build_session
+    bot._build_session = lambda: fake
+    try:
+        result = bot.get_sold_items("charizard")
+    finally:
+        bot._build_session = orig_build
+    assert isinstance(result, dict) and "error" in result, result
+    assert fake.calls == bot.EBAY_MAX_ATTEMPTS
+
+
 def _run():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

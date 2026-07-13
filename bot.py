@@ -21,6 +21,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # IPs, so a proxy is required on hosts like DigitalOcean. Unset/empty = direct connection.
 EBAY_PROXY = os.getenv("EBAY_PROXY")
 
+EBAY_HOME_URL = "https://www.ebay.com/"
 EBAY_SEARCH_URL = "https://www.ebay.com/sch/i.html"
 MAX_RESULTS = 3
 # Rotating residential proxies serve some IPs eBay has flagged; each attempt uses a fresh
@@ -155,6 +156,10 @@ def get_sold_items(item_name):
     for attempt in range(1, EBAY_MAX_ATTEMPTS + 1):
         session = _build_session()
         try:
+            # eBay's bot protection (Akamai) rejects a cold request to the search URL with a
+            # 403. Warming the session on the homepage first collects the cookies it expects,
+            # after which the search returns results -- even from a plain datacenter IP.
+            session.get(EBAY_HOME_URL, timeout=15)
             response = session.get(EBAY_SEARCH_URL, params=params, timeout=15)
         except Exception as exc:
             logger.warning("eBay request failed (attempt %d/%d): %s",

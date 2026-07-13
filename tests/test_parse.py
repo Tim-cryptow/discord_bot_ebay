@@ -114,13 +114,19 @@ class _FakeResponse:
 
 
 class _FakeSession:
-    """Returns queued responses in order (repeating the last) to simulate retries."""
+    """Serves queued responses for the search URL (repeating the last) to simulate retries.
+
+    The homepage warm-up request always returns 200 and does not consume a queued response,
+    so `calls` counts only the search requests.
+    """
 
     def __init__(self, responses):
         self._responses = list(responses)
         self.calls = 0
 
-    def get(self, *args, **kwargs):
+    def get(self, url, *args, **kwargs):
+        if url == bot.EBAY_HOME_URL:
+            return _FakeResponse(200, "")
         resp = self._responses[min(self.calls, len(self._responses) - 1)]
         self.calls += 1
         return resp

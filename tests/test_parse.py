@@ -22,7 +22,7 @@ S_CARD_HTML = """
     <img src="https://i.ebayimg.com/images/g/aaa/s-l225.jpg">
   </li>
   <li class="s-card">
-    <div class="s-card__title">Pokemon Charizard Holo PSA 9</div>
+    <div class="s-card__title">Pokemon Charizard Holo PSA 9<span class="clipped">Opens in a new window or tab</span></div>
     <span class="s-card__price">$450.00</span>
     <a href="https://www.ebay.com/itm/111222333?epid=9&hash=xyz">x</a>
     <img src="https://i.ebayimg.com/images/g/bbb/s-l225.jpg">
@@ -105,6 +105,12 @@ def test_no_results():
 def test_block_detection():
     assert bot._looks_blocked(BLOCK_HTML) is True
     assert bot._looks_blocked("<html>normal results page</html>") is False
+
+
+def test_clean_title_strips_accessibility_text():
+    assert bot._clean_title("Charizard PSA 9Opens in a new window or tab") == "Charizard PSA 9"
+    assert bot._clean_title("New ListingCharizard Holo") == "Charizard Holo"
+    assert bot._clean_title("  Plain Title  ") == "Plain Title"
 
 
 class _FakeResponse:

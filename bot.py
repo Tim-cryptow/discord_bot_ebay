@@ -100,6 +100,14 @@ def get_high_res_image(session, item_url):
     return None
 
 
+def _clean_title(title):
+    """Strips eBay's hidden accessibility/badge text that bleeds into scraped titles."""
+    title = title.replace("Opens in a new window or tab", "")
+    if title.startswith("New Listing"):
+        title = title[len("New Listing"):]
+    return title.strip()
+
+
 def _parse_layout(soup, layout):
     """Extracts sold items from the soup using one layout's selectors."""
     items = []
@@ -110,7 +118,7 @@ def _parse_layout(soup, layout):
         if not (title_tag and price_tag and link_tag):
             continue
 
-        title = title_tag.get_text(strip=True)
+        title = _clean_title(title_tag.get_text(strip=True))
         price = price_tag.get_text(strip=True)
         link = link_tag["href"].split("?")[0]
 

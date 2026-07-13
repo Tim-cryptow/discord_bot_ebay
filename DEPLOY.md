@@ -89,15 +89,32 @@ sudo -u discordbot venv/bin/pip install -r requirements.txt
 systemctl restart discordbot
 ```
 
+## Using a residential proxy (datacenter-IP blocking)
+
+eBay blocks datacenter IPs, so from a host like DigitalOcean every search returns
+HTTP 403. The fix is to route eBay requests through a **residential** proxy. Usage is
+tiny (a few MB per search), so a pay-as-you-go residential plan costs pennies.
+
+1. Sign up with a residential proxy provider (e.g. DataImpulse or IPRoyal) and copy the
+   endpoint they give you, in the form `http://username:password@host:port`.
+2. Add it to the environment file and restart:
+   ```bash
+   echo 'EBAY_PROXY=http://username:password@host:port' >> /etc/discord_bot_ebay.env
+   systemctl restart discordbot
+   ```
+3. Confirm it was picked up: `journalctl -u discordbot -e` should log
+   `eBay proxy configured: yes`. Then test `!ebay pokemon charizard`.
+
+Leave `EBAY_PROXY` unset to connect directly (fine on a residential/unblocked host).
+
 ## Troubleshooting / caveats
 
-- **"eBay is currently blocking automated requests"** or **"No sold items found"**:
-  eBay blocks datacenter IP ranges (which includes DigitalOcean's) more aggressively
-  than residential ones, and varies its page layout. If this persists, the options are
-  to route eBay requests through a proxy, or to migrate to eBay's official API (note:
-  sold/completed price data requires the gated Marketplace Insights API, not the open
-  Browse API). The scraper already handles both the `s-card` and `s-item` layouts and
-  sends browser-like headers, which covers the common cases.
+- **"eBay returned an error (HTTP 403)"** or **"blocking automated requests"**:
+  eBay blocks datacenter IP ranges (DigitalOcean's included). The scraper already uses
+  curl_cffi Chrome impersonation and handles both the `s-card` and `s-item` layouts, but
+  from a blocked IP the only reliable fix is a **residential proxy** — see "Using a
+  residential proxy" above. (Alternatively run on a residential/unblocked host, or move to
+  eBay's official API, whose sold-price data needs the gated Marketplace Insights API.)
 - **Commands do nothing**: confirm the **Message Content Intent** is enabled (see
   Prerequisites) and that the bot has *Send Messages* / *Embed Links* permissions in
   the channel.
